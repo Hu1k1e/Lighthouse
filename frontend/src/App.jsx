@@ -9,6 +9,8 @@ function App() {
   const [selectedContainer, setSelectedContainer] = useState(null);
   const [history, setHistory] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [remoteReleases, setRemoteReleases] = useState([]);
+  const [remoteLoading, setRemoteLoading] = useState(false);
   const [triggers, setTriggers] = useState({ discord: '', ntfy: '' });
 
   useEffect(() => {
@@ -94,6 +96,8 @@ function App() {
   const openDetails = (container) => {
     setSelectedContainer(container);
     setHistoryLoading(true);
+    setRemoteLoading(true);
+    
     fetch(`/api/containers/${container.id}/history`)
       .then(res => res.json())
       .then(data => {
@@ -104,11 +108,23 @@ function App() {
         console.error(err);
         setHistoryLoading(false);
       });
+      
+    fetch(`/api/releases/${encodeURIComponent(container.image)}`)
+      .then(res => res.json())
+      .then(data => {
+        setRemoteReleases(data.releases || []);
+        setRemoteLoading(false);
+      })
+      .catch(err => {
+        console.error("Error fetching remote releases:", err);
+        setRemoteLoading(false);
+      });
   };
 
   const closeModal = () => {
     setSelectedContainer(null);
     setHistory([]);
+    setRemoteReleases([]);
   };
 
   const getRepoLink = (image) => {
@@ -120,6 +136,15 @@ function App() {
       return `https://hub.docker.com/_/${imgNoTag}`;
     }
     return `https://hub.docker.com/r/${imgNoTag}`;
+  };
+
+  const getGithubSearchLink = (image) => {
+    const imgNoTag = image.split(':')[0];
+    if (imgNoTag.includes('ghcr.io')) {
+      return `https://${imgNoTag.replace('ghcr.io', 'github.com')}`;
+    }
+    const cleanName = imgNoTag.replace('lscr.io/linuxserver/', '').replace(/.*\//, '');
+    return `https://github.com/search?q=${cleanName}&type=repositories`;
   };
 
   return (
@@ -331,9 +356,15 @@ function App() {
                 <span className="info-label">Image</span>
                 <span className="info-value" style={{ userSelect: 'all' }}>{selectedContainer.image}</span>
               </div>
-              <div style={{ marginBottom: '20px' }}>
-                <a href={getRepoLink(selectedContainer.image)} target="_blank" rel="noreferrer" className="btn btn-primary" style={{ display: 'inline-block', textDecoration: 'none', textAlign: 'center' }}>
+              <div style={{ marginBottom: '20px', display: 'flex', gap: '10px' }}>
+                <a href={getRepoLink(selectedContainer.image)} target="_blank" rel="noreferrer" className="btn btn-primary" style={{ textDecoration: 'none' }}>
                   View Repository
+                </a>
+                <a href={getGithubSearchLink(selectedContainer.image)} target="_blank" rel="noreferrer" className="btn" style={{ textDecoration: 'none' }}>
+                  <svg style={{marginRight: '6px'}} height="16" viewBox="0 0 16 16" width="16" fill="currentColor">
+                    <path d="M8 0c4.42 0 8 3.58 8 8a8.013 8.013 0 0 1-5.45 7.59c-.4.08-.55-.17-.55-.38 0-.27-.01-1.13-.01-2.2 0-.75-.25-1.23-.54-1.48 1.78-.2 3.65-.88 3.65-3.95 0-.88-.31-1.59-.82-2.15.08-.2.36-1.02-.08-2.12 0 0-.67-.22-2.2.82-.64-.18-1.32-.27-2-.27-.68 0-1.36.09-2 .27-1.53-1.03-2.2-.82-2.2-.82-.44 1.1-.16 1.92-.08 2.12-.51.56-.82 1.28-.82 2.15 0 3.06 1.86 3.75 3.64 3.95-.23.2-.44.55-.51 1.07-.46.21-1.61.55-2.33-.66-.15-.24-.6-.83-1.23-.82-.67.01-.27.38.01.53.34.19.73.9.82 1.13.16.45.68 1.31 2.69.94 0 .67.01 1.3.01 1.49 0 .21-.15.46-.55.38A7.995 7.995 0 0 1 0 8c0-4.42 3.58-8 8-8Z"></path>
+                  </svg>
+                  Search GitHub
                 </a>
               </div>
               
@@ -363,6 +394,25 @@ function App() {
                       </div>
                     );
                   })}
+                </div>
+              )}
+              <h4 style={{ marginBottom: '10px', color: 'var(--text-main)', marginTop: '20px' }}>Remote Version History</h4>
+              <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '10px' }}>Global releases and tags available for this container.</p>
+              {remoteLoading ? (
+                <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Fetching remote tags...</div>
+              ) : remoteReleases.length === 0 ? (
+                <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>No remote history available.</div>
+              ) : (
+                <div className="history-list" style={{ maxHeight: '300px', overflowY: 'auto' }}>
+                  {remoteReleases.map((r, i) => (
+                    <div key={`remote-${i}`} className="history-item">
+                      <div className="history-header">
+                        <span className="history-version">{r.version}</span>
+                        <span className="history-date">{r.timestamp ? new Date(r.timestamp).toLocaleString() : ''}</span>
+                      </div>
+                      <p className="history-changelog">{r.changelog}</p>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
