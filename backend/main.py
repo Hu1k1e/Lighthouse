@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routers import containers
+from routers import containers, updates
 
 app = FastAPI(title="Docker Update Checker")
 
