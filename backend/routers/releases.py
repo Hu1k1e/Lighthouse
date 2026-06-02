@@ -4,7 +4,7 @@ from urllib.parse import unquote
 
 router = APIRouter()
 
-@router.get("/{image_encoded}")
+@router.get("/{image_encoded:path}")
 def get_container_releases(image_encoded: str):
     image_name = unquote(image_encoded)
     releases = get_remote_history(image_name)

@@ -7,17 +7,14 @@ from services.remote_client import get_remote_containers
 
 router = APIRouter()
 
-# Mock remote hosts
-REMOTE_HOSTS = [
-    {"url": "http://helper:8000", "api_key": "default_secret_key"}
-]
-
 @router.get("/")
 def list_containers(db: Session = Depends(get_db)):
+    from models import RemoteHost
     containers = get_local_containers()
     
-    for host in REMOTE_HOSTS:
-        remote_containers = get_remote_containers(host["url"], host["api_key"])
+    remote_hosts = db.query(RemoteHost).all()
+    for host in remote_hosts:
+        remote_containers = get_remote_containers(host.url, host.api_key)
         for rc in remote_containers:
             rc["name"] = f"[Remote] {rc['name']}"
             containers.append(rc)

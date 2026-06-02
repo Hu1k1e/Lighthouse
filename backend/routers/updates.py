@@ -14,7 +14,17 @@ WEBHOOK_URL = "https://discord.com/api/webhooks/mock_url"
 
 @router.post("/scan")
 def scan_for_updates(db: Session = Depends(get_db)):
+    from models import RemoteHost
+    from services.remote_client import get_remote_containers
+    
     containers = get_local_containers()
+    remote_hosts = db.query(RemoteHost).all()
+    for host in remote_hosts:
+        rcs = get_remote_containers(host.url, host.api_key)
+        for rc in rcs:
+            rc["name"] = f"[Remote] {rc['name']}"
+            containers.append(rc)
+            
     updates_found = []
     
     for c in containers:

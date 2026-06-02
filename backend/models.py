@@ -32,3 +32,10 @@ class NotificationTrigger(Base):
     platform = Column(String, index=True) # "discord" or "ntfy"
     webhook_url = Column(String)
     enabled = Column(Boolean, default=True)
+
+class RemoteHost(Base):
+    __tablename__ = "remote_hosts"
+
+    id = Column(Integer, primary_key=True, index=True)
+    url = Column(String, unique=True, index=True)
+    api_key = Column(String)

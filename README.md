@@ -51,7 +51,7 @@ services:
       - "8305:8000"
     command: >
       bash -c "pip install fastapi uvicorn docker && 
-      wget -qO main.py https://raw.githubusercontent.com/Hu1k1e/Lighthouse/main/helper-app/main.py && 
+      python -c 'import urllib.request; urllib.request.urlretrieve(\"https://raw.githubusercontent.com/Hu1k1e/Lighthouse/main/helper-app/main.py\", \"main.py\")' && 
       uvicorn main:app --host 0.0.0.0 --port 8000"
 ```
 *(Alternatively, you can build the helper app directly from the `helper-app/` directory in this repo).*

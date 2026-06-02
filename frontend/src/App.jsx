@@ -12,6 +12,9 @@ function App() {
   const [remoteReleases, setRemoteReleases] = useState([]);
   const [remoteLoading, setRemoteLoading] = useState(false);
   const [triggers, setTriggers] = useState({ discord: '', ntfy: '' });
+  const [remoteHosts, setRemoteHosts] = useState([]);
+  const [newHostUrl, setNewHostUrl] = useState('');
+  const [newHostApiKey, setNewHostApiKey] = useState('');
 
   useEffect(() => {
     fetch('/api/containers/')
@@ -49,7 +52,16 @@ function App() {
         }
       })
       .catch(err => console.error("Error fetching triggers:", err));
+      
+    fetchRemoteHosts();
   }, []);
+
+  const fetchRemoteHosts = () => {
+    fetch('/api/settings/remote-hosts')
+      .then(res => res.json())
+      .then(data => setRemoteHosts(data.hosts || []))
+      .catch(err => console.error(err));
+  };
 
   const handleScan = () => {
     setLoading(true);
@@ -82,6 +94,29 @@ function App() {
     .then(res => res.json())
     .then(() => alert(`${platform.toUpperCase()} trigger saved!`))
     .catch(err => console.error(err));
+  };
+
+  const linkRemoteHost = () => {
+    if (!newHostUrl) return;
+    fetch('/api/settings/remote-hosts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: newHostUrl, api_key: newHostApiKey })
+    })
+    .then(res => res.json())
+    .then(() => {
+      setNewHostUrl('');
+      setNewHostApiKey('');
+      fetchRemoteHosts();
+      alert('Remote host linked successfully!');
+    })
+    .catch(err => console.error(err));
+  };
+
+  const deleteRemoteHost = (id) => {
+    fetch(`/api/settings/remote-hosts/${id}`, { method: 'DELETE' })
+      .then(() => fetchRemoteHosts())
+      .catch(err => console.error(err));
   };
 
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -190,7 +225,7 @@ function App() {
               </div>
               <div className="stat-card">
                 <span className="stat-label">Remote Hosts</span>
-                <span className="stat-value">1</span>
+                <span className="stat-value">{remoteHosts.length}</span>
               </div>
             </div>
 
@@ -333,12 +368,44 @@ function App() {
                <div className="card-header"><div className="card-title">Add Remote Host</div></div>
                <div className="card-body">
                   <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
-                    <input type="text" placeholder="http://192.168.1.50:8305" className="search-input" style={{ flex: 1 }} />
-                    <input type="password" placeholder="API Key" className="search-input" style={{ flex: 1 }} />
-                    <button className="btn btn-primary">Link</button>
+                    <input 
+                      type="text" 
+                      placeholder="http://192.168.1.50:8305" 
+                      className="search-input" 
+                      style={{ flex: 1 }} 
+                      value={newHostUrl}
+                      onChange={e => setNewHostUrl(e.target.value)}
+                    />
+                    <input 
+                      type="password" 
+                      placeholder="API Key" 
+                      className="search-input" 
+                      style={{ flex: 1 }} 
+                      value={newHostApiKey}
+                      onChange={e => setNewHostApiKey(e.target.value)}
+                    />
+                    <button className="btn btn-primary" onClick={linkRemoteHost}>Link</button>
                   </div>
                </div>
             </div>
+            
+            {remoteHosts.length > 0 && (
+              <div style={{ marginTop: '30px' }}>
+                <h4 style={{ color: 'var(--text-main)', marginBottom: '15px' }}>Linked Hosts</h4>
+                <div className="container-grid">
+                  {remoteHosts.map(host => (
+                    <div key={host.id} className="container-card">
+                      <div className="card-header">
+                        <div className="card-title" style={{ fontSize: '14px', fontFamily: 'monospace' }}>{host.url}</div>
+                      </div>
+                      <div className="card-footer">
+                        <button className="btn" style={{ color: 'var(--danger)', borderColor: 'var(--danger)' }} onClick={() => deleteRemoteHost(host.id)}>Disconnect</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </main>

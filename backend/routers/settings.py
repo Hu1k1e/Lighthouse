@@ -33,3 +33,36 @@ def set_trigger(trigger_data: TriggerUpdate, db: Session = Depends(get_db)):
     
     db.commit()
     return {"status": "success"}
+
+class RemoteHostCreate(BaseModel):
+    url: str
+    api_key: str
+
+@router.get("/remote-hosts")
+def get_remote_hosts(db: Session = Depends(get_db)):
+    from models import RemoteHost
+    hosts = db.query(RemoteHost).all()
+    return {"hosts": [{"id": h.id, "url": h.url} for h in hosts]}
+
+@router.post("/remote-hosts")
+def add_remote_host(host_data: RemoteHostCreate, db: Session = Depends(get_db)):
+    from models import RemoteHost
+    # Check if exists
+    existing = db.query(RemoteHost).filter(RemoteHost.url == host_data.url).first()
+    if existing:
+        existing.api_key = host_data.api_key
+    else:
+        new_host = RemoteHost(url=host_data.url, api_key=host_data.api_key)
+        db.add(new_host)
+    
+    db.commit()
+    return {"status": "success"}
+
+@router.delete("/remote-hosts/{host_id}")
+def delete_remote_host(host_id: int, db: Session = Depends(get_db)):
+    from models import RemoteHost
+    host = db.query(RemoteHost).filter(RemoteHost.id == host_id).first()
+    if host:
+        db.delete(host)
+        db.commit()
+    return {"status": "success"}
