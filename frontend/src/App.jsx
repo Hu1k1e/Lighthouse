@@ -6,16 +6,49 @@ function App() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Mock data for initial UI before backend is fully hooked up
-    setTimeout(() => {
-      setContainers([
-        { id: '1a2b3c4d', name: 'tracearr-server', image: 'connorgallopo/tracearr:latest', state: 'running', status: 'up-to-date', version: '1.5.0' },
-        { id: '5e6f7g8h', name: 'plex-media-server', image: 'plexinc/pms-docker:latest', state: 'running', status: 'update_available', version: '1.32.1', latest: '1.32.2' },
-        { id: '9i0j1k2l', name: 'portainer', image: 'portainer/portainer-ce:2.18.4', state: 'running', status: 'up-to-date', version: '2.18.4' },
-      ]);
-      setLoading(false);
-    }, 1000);
+    fetch('/api/containers')
+      .then(res => res.json())
+      .then(data => {
+        if (data.containers) {
+          const mapped = data.containers.map(c => ({
+            id: c.id,
+            name: c.name,
+            image: c.image,
+            state: c.state,
+            status: 'up-to-date',
+            version: c.image.includes(':') ? c.image.split(':')[1] : 'latest'
+          }));
+          setContainers(mapped);
+        }
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error("Error fetching containers:", err);
+        setLoading(false);
+      });
   }, []);
+
+  const handleScan = () => {
+    setLoading(true);
+    fetch('/api/updates/scan', { method: 'POST' })
+      .then(res => res.json())
+      .then(data => {
+        if (data.updates) {
+          setContainers(prev => prev.map(c => {
+            const update = data.updates.find(u => u.container_id === c.id);
+            if (update) {
+              return { ...c, status: 'update_available', latest: update.latest_version };
+            }
+            return c;
+          }));
+        }
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error("Error scanning:", err);
+        setLoading(false);
+      });
+  };
 
   return (
     <div className="app-container">
@@ -66,7 +99,9 @@ function App() {
           {/* Containers List */}
           <div className="section-title">
             <span>Watched Containers</span>
-            <button className="btn">Scan Now</button>
+            <button className="btn" onClick={handleScan} disabled={loading}>
+              {loading ? 'Scanning...' : 'Scan Now'}
+            </button>
           </div>
 
           {loading ? (
