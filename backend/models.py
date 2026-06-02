@@ -24,3 +24,11 @@ class UpdateHistory(Base):
     digest = Column(String, nullable=True)
     changelog_summary = Column(String)
     timestamp = Column(DateTime, default=datetime.datetime.utcnow)
+
+class NotificationTrigger(Base):
+    __tablename__ = "notification_triggers"
+
+    id = Column(Integer, primary_key=True, index=True)
+    platform = Column(String, index=True) # "discord" or "ntfy"
+    webhook_url = Column(String)
+    enabled = Column(Boolean, default=True)

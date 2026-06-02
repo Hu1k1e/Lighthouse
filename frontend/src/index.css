@@ -107,6 +107,11 @@ body {
   overflow-y: auto;
 }
 
+.page-view {
+  padding: 32px;
+  overflow-y: auto;
+}
+
 /* Grid & Cards */
 .stats-grid {
   display: grid;
@@ -176,6 +181,10 @@ body {
 .container-card:hover {
   border-color: var(--text-muted);
   transform: translateY(-2px);
+}
+
+.clickable-card {
+  cursor: pointer;
 }
 
 .card-header {
@@ -371,4 +380,19 @@ body {
   line-height: 1.4;
   color: var(--text-secondary);
   white-space: pre-wrap;
+}
+
+.history-item-current {
+  border-color: var(--success);
+  background-color: rgba(46, 160, 67, 0.05);
+}
+
+.current-badge {
+  background-color: var(--success);
+  color: #fff;
+  font-size: 0.7rem;
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin-left: 10px;
+  font-weight: 600;
 }

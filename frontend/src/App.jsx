@@ -9,6 +9,7 @@ function App() {
   const [selectedContainer, setSelectedContainer] = useState(null);
   const [history, setHistory] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [triggers, setTriggers] = useState({ discord: '', ntfy: '' });
 
   useEffect(() => {
     fetch('/api/containers/')
@@ -33,6 +34,19 @@ function App() {
         console.error("Error fetching containers:", err);
         setLoading(false);
       });
+
+    fetch('/api/settings/triggers')
+      .then(res => res.json())
+      .then(data => {
+        if (data.triggers) {
+          const tMap = { discord: '', ntfy: '' };
+          data.triggers.forEach(t => {
+            if (t.enabled) tMap[t.platform] = t.webhook_url;
+          });
+          setTriggers(tMap);
+        }
+      })
+      .catch(err => console.error("Error fetching triggers:", err));
   }, []);
 
   const handleScan = () => {
@@ -55,6 +69,17 @@ function App() {
         console.error("Error scanning:", err);
         setLoading(false);
       });
+  };
+
+  const saveTrigger = (platform, url) => {
+    fetch('/api/settings/triggers', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ platform, webhook_url: url, enabled: url.length > 0 })
+    })
+    .then(res => res.json())
+    .then(() => alert(`${platform.toUpperCase()} trigger saved!`))
+    .catch(err => console.error(err));
   };
 
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -177,7 +202,7 @@ function App() {
             ) : (
               <div className="container-grid">
                 {filteredContainers.map((container) => (
-                  <div key={container.id} className="container-card">
+                  <div key={container.id} className="container-card clickable-card" onClick={() => openDetails(container)}>
                     <div className="card-header">
                       <div className="card-title">{container.name}</div>
                       <div className={`status-badge ${container.status === 'update_available' ? 'update' : ''}`}>
@@ -201,11 +226,6 @@ function App() {
                           <span className="info-value" style={{ color: 'var(--accent-color)' }}>{container.latest}</span>
                         </div>
                       )}
-                    </div>
-                    <div className="card-footer">
-                      <button className={`btn ${container.status === 'update_available' ? 'btn-primary' : ''}`} style={{ width: '100%' }} onClick={() => openDetails(container)}>
-                        Details
-                      </button>
                     </div>
                   </div>
                 ))}
@@ -242,10 +262,39 @@ function App() {
         {activeTab === 'triggers' && (
           <div className="page-view">
             <h3 style={{ color: 'var(--text-main)', marginBottom: '1rem' }}>Notification Triggers</h3>
-            <p style={{ color: 'var(--text-muted)' }}>Configure webhooks (Discord, Slack, Email) to run when updates are found.</p>
+            <p style={{ color: 'var(--text-muted)' }}>Configure webhooks (Discord, NTFY) to run when updates are found.</p>
+            
             <div className="container-card" style={{ marginTop: '20px' }}>
+               <div className="card-header"><div className="card-title">Discord Webhook</div></div>
                <div className="card-body">
-                  <p style={{ color: 'var(--text-muted)' }}>Backend trigger routing is currently managed via .env variables (e.g., DISCORD_WEBHOOK_URL). UI configuration coming soon.</p>
+                  <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
+                    <input 
+                      type="text" 
+                      placeholder="https://discord.com/api/webhooks/..." 
+                      className="search-input" 
+                      style={{ flex: 1 }}
+                      value={triggers.discord}
+                      onChange={e => setTriggers({ ...triggers, discord: e.target.value })}
+                    />
+                    <button className="btn btn-primary" onClick={() => saveTrigger('discord', triggers.discord)}>Save</button>
+                  </div>
+               </div>
+            </div>
+
+            <div className="container-card" style={{ marginTop: '20px' }}>
+               <div className="card-header"><div className="card-title">NTFY Webhook</div></div>
+               <div className="card-body">
+                  <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
+                    <input 
+                      type="text" 
+                      placeholder="https://ntfy.sh/mytopic" 
+                      className="search-input" 
+                      style={{ flex: 1 }}
+                      value={triggers.ntfy}
+                      onChange={e => setTriggers({ ...triggers, ntfy: e.target.value })}
+                    />
+                    <button className="btn btn-primary" onClick={() => saveTrigger('ntfy', triggers.ntfy)}>Save</button>
+                  </div>
                </div>
             </div>
           </div>
@@ -295,16 +344,25 @@ function App() {
                 <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>No updates recorded yet.</div>
               ) : (
                 <div className="history-list">
-                  {history.map((h, i) => (
-                    <div key={i} className="history-item">
-                      <div className="history-header">
-                        <span className="history-version">{h.version}</span>
-                        <span className="history-date">{new Date(h.timestamp).toLocaleString()}</span>
+                  {history.map((h, i) => {
+                    const isCurrent = selectedContainer.version === 'latest' 
+                      ? h.digest === selectedContainer.digest 
+                      : h.version === selectedContainer.version;
+
+                    return (
+                      <div key={i} className={`history-item ${isCurrent ? 'history-item-current' : ''}`}>
+                        <div className="history-header">
+                          <span className="history-version">
+                            {h.version} 
+                            {isCurrent && <span className="current-badge">✓ Currently Installed</span>}
+                          </span>
+                          <span className="history-date">{new Date(h.timestamp).toLocaleString()}</span>
+                        </div>
+                        {h.digest && <div className="history-digest" style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Digest: {h.digest.substring(0, 15)}...</div>}
+                        <p className="history-changelog">{h.changelog}</p>
                       </div>
-                      {h.digest && <div className="history-digest" style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Digest: {h.digest.substring(0, 15)}...</div>}
-                      <p className="history-changelog">{h.changelog}</p>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>

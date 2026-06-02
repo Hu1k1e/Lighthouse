@@ -69,6 +69,6 @@ def scan_for_updates(db: Session = Depends(get_db)):
                     "changelog": changelog
                 }
                 updates_found.append(update_info)
-                trigger_webhook(WEBHOOK_URL, update_info)
+                trigger_webhook(update_info, db)
             
     return {"status": "success", "updates": updates_found}

@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routers import containers, updates
+from routers import containers, updates, settings
 import models
 from database import engine
 
@@ -18,6 +18,7 @@ app.add_middleware(
 
 app.include_router(containers.router, prefix="/api/containers", tags=["containers"])
 app.include_router(updates.router, prefix="/api/updates", tags=["updates"])
+app.include_router(settings.router, prefix="/api/settings", tags=["settings"])
 
 @app.get("/api/health")
 def health_check():
