@@ -48,7 +48,7 @@ services:
       # Set a strong, random API key. You will need to enter this in the main Lighthouse UI.
       - HELPER_API_KEY=your_secure_api_key_here
     ports:
-      - "8000:8000"
+      - "8305:8000"
     command: >
       bash -c "pip install fastapi uvicorn docker && 
       wget -qO main.py https://raw.githubusercontent.com/Hu1k1e/Lighthouse/main/helper-app/main.py && 
@@ -57,4 +57,4 @@ services:
 *(Alternatively, you can build the helper app directly from the `helper-app/` directory in this repo).*
 
 ### Linking the Helper App
-Once the helper app is running on the remote machine (e.g., `http://192.168.1.50:8000`), open your main Lighthouse dashboard, navigate to **Settings**, and add a new Remote Host using that IP and the `HELPER_API_KEY` you defined.
+Once the helper app is running on the remote machine (e.g., `http://192.168.1.50:8305`), open your main Lighthouse dashboard, navigate to **Settings**, and add a new Remote Host using that IP and the `HELPER_API_KEY` you defined.
