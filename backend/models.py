@@ -13,3 +13,14 @@ class Container(Base):
     latest_version = Column(String, nullable=True)
     update_available = Column(Boolean, default=False)
     last_checked = Column(DateTime, default=datetime.datetime.utcnow)
+
+class UpdateHistory(Base):
+    __tablename__ = "update_history"
+
+    id = Column(Integer, primary_key=True, index=True)
+    container_id = Column(String, index=True)
+    image = Column(String)
+    version_tag = Column(String)
+    digest = Column(String, nullable=True)
+    changelog_summary = Column(String)
+    timestamp = Column(DateTime, default=datetime.datetime.utcnow)

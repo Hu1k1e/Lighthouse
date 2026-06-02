@@ -4,6 +4,11 @@ import './index.css';
 function App() {
   const [containers, setContainers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filter, setFilter] = useState('all');
+  const [selectedContainer, setSelectedContainer] = useState(null);
+  const [history, setHistory] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
 
   useEffect(() => {
     fetch('/api/containers/')
@@ -51,6 +56,44 @@ function App() {
   };
 
   const [activeTab, setActiveTab] = useState('dashboard');
+
+  const filteredContainers = containers.filter(c => {
+    const matchesSearch = c.name.toLowerCase().includes(searchQuery.toLowerCase()) || c.image.toLowerCase().includes(searchQuery.toLowerCase());
+    if (filter === 'updates') return matchesSearch && c.status === 'update_available';
+    if (filter === 'uptodate') return matchesSearch && c.status === 'up-to-date';
+    return matchesSearch;
+  });
+
+  const openDetails = (container) => {
+    setSelectedContainer(container);
+    setHistoryLoading(true);
+    fetch(`/api/containers/${container.id}/history`)
+      .then(res => res.json())
+      .then(data => {
+        setHistory(data.history || []);
+        setHistoryLoading(false);
+      })
+      .catch(err => {
+        console.error(err);
+        setHistoryLoading(false);
+      });
+  };
+
+  const closeModal = () => {
+    setSelectedContainer(null);
+    setHistory([]);
+  };
+
+  const getRepoLink = (image) => {
+    const imgNoTag = image.split(':')[0];
+    if (imgNoTag.includes('ghcr.io')) {
+      return `https://${imgNoTag.replace('ghcr.io', 'github.com')}`;
+    }
+    if (!imgNoTag.includes('/')) {
+      return `https://hub.docker.com/_/${imgNoTag}`;
+    }
+    return `https://hub.docker.com/r/${imgNoTag}`;
+  };
 
   return (
     <div className="app-container">
@@ -102,18 +145,36 @@ function App() {
             {/* Containers List */}
             <div className="section-title">
               <span>Watched Containers</span>
-              <button className="btn" onClick={handleScan} disabled={loading}>
-                {loading ? 'Scanning...' : 'Scan Now'}
-              </button>
+              <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                <input 
+                  type="text" 
+                  placeholder="Search..." 
+                  className="search-input"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+                <select 
+                  className="filter-select"
+                  value={filter}
+                  onChange={(e) => setFilter(e.target.value)}
+                >
+                  <option value="all">All</option>
+                  <option value="updates">Updates Available</option>
+                  <option value="uptodate">Up to Date</option>
+                </select>
+                <button className="btn" onClick={handleScan} disabled={loading}>
+                  {loading ? 'Scanning...' : 'Scan Now'}
+                </button>
+              </div>
             </div>
 
             {loading ? (
               <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>Loading containers...</div>
-            ) : containers.length === 0 ? (
-              <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>No containers found. Ensure Docker socket is mounted.</div>
+            ) : filteredContainers.length === 0 ? (
+              <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>No containers found matching your criteria.</div>
             ) : (
               <div className="container-grid">
-                {containers.map((container) => (
+                {filteredContainers.map((container) => (
                   <div key={container.id} className="container-card">
                     <div className="card-header">
                       <div className="card-title">{container.name}</div>
@@ -124,11 +185,11 @@ function App() {
                     <div className="card-body">
                       <div className="info-row">
                         <span className="info-label">Image</span>
-                        <span className="info-value">{container.image.split(':')[0]}</span>
+                        <span className="info-value" style={{fontSize: '0.85rem'}}>{container.image.split(':')[0]}</span>
                       </div>
                       <div className="info-row">
                         <span className="info-label">Current Version</span>
-                        <span className="info-value">{container.version}</span>
+                        <span className="info-value">{container.version || 'latest'}</span>
                       </div>
                       {container.status === 'update_available' && (
                         <div className="info-row">
@@ -138,11 +199,9 @@ function App() {
                       )}
                     </div>
                     <div className="card-footer">
-                      {container.status === 'update_available' ? (
-                        <button className="btn btn-primary" style={{ width: '100%' }}>View Changelog</button>
-                      ) : (
-                        <button className="btn" style={{ width: '100%' }}>Details</button>
-                      )}
+                      <button className={`btn ${container.status === 'update_available' ? 'btn-primary' : ''}`} style={{ width: '100%' }} onClick={() => openDetails(container)}>
+                        Details
+                      </button>
                     </div>
                   </div>
                 ))}
@@ -196,8 +255,8 @@ function App() {
                <div className="card-header"><div className="card-title">Add Remote Host</div></div>
                <div className="card-body">
                   <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
-                    <input type="text" placeholder="http://192.168.1.50:8305" style={{ flex: 1, padding: '10px', borderRadius: '4px', border: '1px solid #333', background: 'var(--bg-card)', color: '#fff' }} />
-                    <input type="password" placeholder="API Key" style={{ flex: 1, padding: '10px', borderRadius: '4px', border: '1px solid #333', background: 'var(--bg-card)', color: '#fff' }} />
+                    <input type="text" placeholder="http://192.168.1.50:8305" className="search-input" style={{ flex: 1 }} />
+                    <input type="password" placeholder="API Key" className="search-input" style={{ flex: 1 }} />
                     <button className="btn btn-primary">Link</button>
                   </div>
                </div>
@@ -205,6 +264,49 @@ function App() {
           </div>
         )}
       </main>
+
+      {/* Details Modal */}
+      {selectedContainer && (
+        <div className="modal-backdrop" onClick={closeModal}>
+          <div className="modal-content" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>{selectedContainer.name}</h3>
+              <button className="close-btn" onClick={closeModal}>×</button>
+            </div>
+            <div className="modal-body">
+              <div className="info-row" style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '10px', marginBottom: '15px' }}>
+                <span className="info-label">Image</span>
+                <span className="info-value" style={{ userSelect: 'all' }}>{selectedContainer.image}</span>
+              </div>
+              <div style={{ marginBottom: '20px' }}>
+                <a href={getRepoLink(selectedContainer.image)} target="_blank" rel="noreferrer" className="btn btn-primary" style={{ display: 'inline-block', textDecoration: 'none', textAlign: 'center' }}>
+                  View Repository
+                </a>
+              </div>
+              
+              <h4 style={{ marginBottom: '10px', color: 'var(--text-main)' }}>Update History</h4>
+              {historyLoading ? (
+                <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Loading history...</div>
+              ) : history.length === 0 ? (
+                <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>No updates recorded yet.</div>
+              ) : (
+                <div className="history-list">
+                  {history.map((h, i) => (
+                    <div key={i} className="history-item">
+                      <div className="history-header">
+                        <span className="history-version">{h.version}</span>
+                        <span className="history-date">{new Date(h.timestamp).toLocaleString()}</span>
+                      </div>
+                      {h.digest && <div className="history-digest" style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Digest: {h.digest.substring(0, 15)}...</div>}
+                      <p className="history-changelog">{h.changelog}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
