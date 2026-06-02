@@ -59,26 +59,32 @@ def scan_for_updates(db: Session = Depends(get_db)):
             ).first()
             
             if not existing:
-                # Record to history
-                history_entry = UpdateHistory(
+                new_hist = UpdateHistory(
                     container_id=c["id"],
                     image=image,
                     version_tag=latest_tag or current_version,
-                    digest=remote_digest,
-                    changelog_summary=changelog
+                    changelog_summary=changelog,
+                    digest=remote_digest
                 )
-                db.add(history_entry)
+                db.add(new_hist)
                 db.commit()
                 
-                update_info = {
+                updates_found.append({
                     "container_id": c["id"],
-                    "name": c["name"],
                     "image": image,
-                    "current_version": current_version,
-                    "latest_version": latest_tag or "new digest available",
-                    "changelog": changelog
-                }
-                updates_found.append(update_info)
-                trigger_webhook(update_info, db)
+                    "latest_version": latest_tag or current_version
+                })
+                
+                # Execute notification triggers
+                try:
+                    from services.notifications import send_update_notification
+                    send_update_notification(db, c["name"], image, current_version, latest_tag or current_version, changelog)
+                except Exception as e:
+                    print(f"Failed to send notifications: {e}")
+            else:
+                # Overwrite the stub string with actual fetched release notes if we finally got them
+                if "brings performance improvements, bug fixes" in existing.changelog_summary:
+                    existing.changelog_summary = changelog
+                    db.commit()
             
     return {"status": "success", "updates": updates_found}
