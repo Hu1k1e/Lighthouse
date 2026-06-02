@@ -6,7 +6,7 @@ function App() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch('/api/containers')
+    fetch('/api/containers/')
       .then(res => res.json())
       .then(data => {
         if (data.containers) {
