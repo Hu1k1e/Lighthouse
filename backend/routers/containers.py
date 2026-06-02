@@ -12,7 +12,7 @@ REMOTE_HOSTS = [
     {"url": "http://helper:8000", "api_key": "default_secret_key"}
 ]
 
-@router.get("")
+@router.get("/")
 def list_containers(db: Session = Depends(get_db)):
     containers = get_local_containers()
     
