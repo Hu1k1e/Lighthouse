@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  backend:
+    build: 
+      context: ./backend
+      dockerfile: Dockerfile
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./docker_updates.db:/app/docker_updates.db
+    ports:
+      - "8000:8000"
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "5173:80"
+
+  # Optional local helper app for testing remote functionality
+  helper:
+    build:
+      context: ./helper-app
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - HELPER_API_KEY=default_secret_key
