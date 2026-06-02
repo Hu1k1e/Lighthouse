@@ -30,7 +30,10 @@ def list_containers(db: Session = Depends(get_db)):
         
         if latest_history:
             c["status"] = "update_available"
-            c["latest"] = latest_history.version_tag if latest_history.version_tag != "latest" else "new digest available"
+            if latest_history.version_tag != "latest":
+                c["latest"] = latest_history.version_tag
+            else:
+                c["latest"] = f"latest ({latest_history.digest[:12]})" if latest_history.digest else "new update available"
         else:
             c["status"] = "up-to-date"
             

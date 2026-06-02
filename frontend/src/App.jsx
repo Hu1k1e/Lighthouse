@@ -20,8 +20,10 @@ function App() {
             name: c.name,
             image: c.image,
             state: c.state,
-            status: 'up-to-date',
-            version: c.image.includes(':') ? c.image.split(':')[1] : 'latest'
+            status: c.status || 'up-to-date',
+            version: c.image.includes(':') ? c.image.split(':')[1] : 'latest',
+            digest: c.digest,
+            latest: c.latest
           }));
           setContainers(mapped);
         }
@@ -189,7 +191,9 @@ function App() {
                       </div>
                       <div className="info-row">
                         <span className="info-label">Current Version</span>
-                        <span className="info-value">{container.version || 'latest'}</span>
+                        <span className="info-value">
+                          {container.version === 'latest' && container.digest ? `latest (${container.digest.substring(0, 12)})` : container.version}
+                        </span>
                       </div>
                       {container.status === 'update_available' && (
                         <div className="info-row">
