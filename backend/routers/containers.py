@@ -27,6 +27,7 @@ def list_containers(db: Session = Depends(get_db)):
         
         if latest_history:
             c["status"] = "update_available"
+            c["changelog"] = latest_history.changelog_summary
             if latest_history.version_tag != "latest":
                 c["latest"] = latest_history.version_tag
             else:
