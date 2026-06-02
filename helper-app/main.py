@@ -20,11 +20,19 @@ def list_containers(api_key: str = Depends(get_api_key)):
         containers = client.containers.list(all=True)
         result = []
         for c in containers:
+            repo_digests = c.image.attrs.get('RepoDigests', [])
+            digest = None
+            if repo_digests:
+                digest_parts = repo_digests[0].split('@')
+                if len(digest_parts) > 1:
+                    digest = digest_parts[1]
+                    
             result.append({
                 "id": c.short_id,
                 "name": c.name,
                 "image": c.image.tags[0] if c.image.tags else c.image.id,
                 "state": c.status,
+                "digest": digest
             })
         return result
     except Exception as e:
