@@ -397,3 +397,138 @@ body {
   margin-left: 10px;
   font-weight: 600;
 }
+
+/* Releases Subpage Styles */
+.releases-view .releases-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.release-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: var(--panel-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 16px 20px;
+  transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+}
+
+.release-row:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+  border-color: #484f58;
+}
+
+.release-row.current {
+  border-color: var(--success);
+  background-color: rgba(46, 160, 67, 0.05);
+}
+
+.release-info {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.release-date {
+  color: var(--text-muted);
+  font-size: 13px;
+  min-width: 90px;
+}
+
+.release-name {
+  color: #fff;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.badge {
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.badge-current {
+  background-color: rgba(46, 160, 67, 0.1);
+  color: var(--success);
+  border: 1px solid rgba(46, 160, 67, 0.4);
+}
+
+.badge-latest {
+  background-color: rgba(88, 166, 255, 0.1);
+  color: var(--accent-color);
+  border: 1px solid rgba(88, 166, 255, 0.4);
+}
+
+.btn-view-changelog {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Markdown Rendering Styles for Changelog */
+.markdown-body-content {
+  font-family: var(--font-family);
+  color: var(--text-main);
+  line-height: 1.6;
+}
+
+.markdown-heading {
+  color: #fff;
+  margin-top: 24px;
+  margin-bottom: 16px;
+  font-weight: 600;
+}
+
+.markdown-h1 {
+  font-size: 24px;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 8px;
+}
+
+.markdown-h2 {
+  font-size: 20px;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 6px;
+}
+
+.markdown-h3 {
+  font-size: 16px;
+}
+
+.markdown-paragraph {
+  margin-bottom: 16px;
+}
+
+.markdown-list {
+  padding-left: 24px;
+  margin-bottom: 16px;
+}
+
+.markdown-li {
+  margin-bottom: 8px;
+}
+
+.markdown-inline-code {
+  background-color: rgba(110, 118, 129, 0.4);
+  padding: 2px 6px;
+  border-radius: 6px;
+  font-family: monospace;
+  font-size: 13px;
+  color: #c9d1d9;
+}
+
+.markdown-link {
+  color: var(--accent-color);
+  text-decoration: none;
+}
+
+.markdown-link:hover {
+  text-decoration: underline;
+}

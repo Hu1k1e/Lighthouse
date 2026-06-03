@@ -67,6 +67,7 @@ def get_remote_history(image_name: str) -> list:
                 return [
                     {
                         "version": r.get("tag_name"),
+                        "title": r.get("name") or r.get("tag_name"),
                         "timestamp": r.get("published_at"),
                         "changelog": r.get("body", "No release notes provided.")
                     }
@@ -88,6 +89,7 @@ def get_remote_history(image_name: str) -> list:
             return [
                 {
                     "version": t.get("name"),
+                    "title": t.get("name"),
                     "timestamp": t.get("last_updated"),
                     "changelog": "Standard Docker Hub Tag. No rich release notes available."
                 }

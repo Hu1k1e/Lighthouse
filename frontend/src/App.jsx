@@ -15,6 +15,9 @@ function App() {
   const [remoteHosts, setRemoteHosts] = useState([]);
   const [newHostUrl, setNewHostUrl] = useState('');
   const [newHostApiKey, setNewHostApiKey] = useState('');
+  const [currentView, setCurrentView] = useState('list');
+  const [selectedRelease, setSelectedRelease] = useState(null);
+  const [originTab, setOriginTab] = useState('dashboard');
 
   useEffect(() => {
     fetch('/api/containers/')
@@ -129,8 +132,10 @@ function App() {
     return matchesSearch;
   });
 
-  const openDetails = (container) => {
+  const openDetails = (container, fromTab = 'dashboard') => {
     setSelectedContainer(container);
+    setOriginTab(fromTab);
+    setCurrentView('releases');
     setHistoryLoading(true);
     setRemoteLoading(true);
     
@@ -157,10 +162,198 @@ function App() {
       });
   };
 
-  const closeModal = () => {
+  const goBack = () => {
+    setCurrentView('list');
     setSelectedContainer(null);
     setHistory([]);
     setRemoteReleases([]);
+    setSelectedRelease(null);
+  };
+
+  const getRelativeTime = (timestamp) => {
+    if (!timestamp) return '';
+    const now = new Date();
+    const date = new Date(timestamp);
+    const diffMs = now - date;
+    const diffSec = Math.floor(diffMs / 1000);
+    const diffMin = Math.floor(diffSec / 60);
+    const diffHrs = Math.floor(diffMin / 60);
+    const diffDays = Math.floor(diffHrs / 24);
+    
+    if (diffDays > 365) {
+      const years = Math.floor(diffDays / 365);
+      return `${years} year${years > 1 ? 's' : ''} ago`;
+    }
+    if (diffDays > 30) {
+      const months = Math.floor(diffDays / 30);
+      return `${months} month${months > 1 ? 's' : ''} ago`;
+    }
+    if (diffDays > 1) {
+      return `${diffDays} days ago`;
+    }
+    if (diffDays === 1) {
+      return 'yesterday';
+    }
+    if (diffHrs >= 1) {
+      return `${diffHrs} hour${diffHrs > 1 ? 's' : ''} ago`;
+    }
+    if (diffMin >= 1) {
+      return `${diffMin} minute${diffMin > 1 ? 's' : ''} ago`;
+    }
+    return 'just now';
+  };
+
+  const formatDate = (timestamp) => {
+    if (!timestamp) return '';
+    const date = new Date(timestamp);
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const renderMarkdown = (text) => {
+    if (!text) return null;
+    
+    const lines = text.split('\n');
+    const rendered = [];
+    let currentList = [];
+    let listKey = 0;
+
+    const flushList = () => {
+      if (currentList.length > 0) {
+        rendered.push(
+          <ul key={`list-${listKey++}`} className="markdown-list">
+            {currentList}
+          </ul>
+        );
+        currentList = [];
+      }
+    };
+
+    const parseInline = (lineText) => {
+      let parts = [{ type: 'text', content: lineText }];
+      const linkRegex = /\[([^\]]+)\]\(([^)]+)\)/g;
+      
+      let processedParts = [];
+      for (const part of parts) {
+        if (part.type !== 'text') {
+          processedParts.push(part);
+          continue;
+        }
+
+        let lastIndex = 0;
+        const codeRegex = /`([^`]+)`/g;
+        let cMatch;
+        let foundCode = false;
+
+        while ((cMatch = codeRegex.exec(part.content)) !== null) {
+          foundCode = true;
+          if (cMatch.index > lastIndex) {
+            processedParts.push({ type: 'text', content: part.content.substring(lastIndex, cMatch.index) });
+          }
+          processedParts.push({ type: 'code', content: cMatch[1] });
+          lastIndex = codeRegex.lastIndex;
+        }
+
+        if (foundCode) {
+          if (lastIndex < part.content.length) {
+            processedParts.push({ type: 'text', content: part.content.substring(lastIndex) });
+          }
+        } else {
+          processedParts.push(part);
+        }
+      }
+      parts = processedParts;
+
+      processedParts = [];
+      for (const part of parts) {
+        if (part.type !== 'text') {
+          processedParts.push(part);
+          continue;
+        }
+
+        let lastIndex = 0;
+        let lMatch;
+        let foundLink = false;
+        linkRegex.lastIndex = 0;
+
+        while ((lMatch = linkRegex.exec(part.content)) !== null) {
+          foundLink = true;
+          if (lMatch.index > lastIndex) {
+            processedParts.push({ type: 'text', content: part.content.substring(lastIndex, lMatch.index) });
+          }
+          processedParts.push({ type: 'link', text: lMatch[1], url: lMatch[2] });
+          lastIndex = linkRegex.lastIndex;
+        }
+
+        if (foundLink) {
+          if (lastIndex < part.content.length) {
+            processedParts.push({ type: 'text', content: part.content.substring(lastIndex) });
+          }
+        } else {
+          processedParts.push(part);
+        }
+      }
+      parts = processedParts;
+
+      return parts.map((part, index) => {
+        if (part.type === 'code') {
+          return <code key={index} className="markdown-inline-code">{part.content}</code>;
+        }
+        if (part.type === 'link') {
+          return <a key={index} href={part.url} target="_blank" rel="noreferrer" className="markdown-link">{part.text}</a>;
+        }
+        return part.content;
+      });
+    };
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      
+      if (!line) {
+        continue;
+      }
+
+      if (line.startsWith('🚀') || line.startsWith('🐛') || line.startsWith('✨') || line.startsWith('🛠️') || line.startsWith('🔒')) {
+        flushList();
+        rendered.push(
+          <h3 key={`heading-${i}`} className="markdown-heading markdown-h3">
+            {line}
+          </h3>
+        );
+      }
+      else if (line.startsWith('#') || line.startsWith('##') || line.startsWith('###')) {
+        flushList();
+        const level = line.indexOf(' ') > 0 ? line.indexOf(' ') : 3;
+        const titleText = line.substring(level).trim();
+        const HeaderTag = level === 1 ? 'h1' : level === 2 ? 'h2' : 'h3';
+        rendered.push(
+          <HeaderTag key={`heading-${i}`} className={`markdown-heading markdown-h${level}`}>
+            {titleText}
+          </HeaderTag>
+        );
+      } 
+      else if (line.startsWith('-') || line.startsWith('*')) {
+        const itemContent = line.substring(1).trim();
+        currentList.push(
+          <li key={`li-${i}`} className="markdown-li">
+            {parseInline(itemContent)}
+          </li>
+        );
+      } 
+      else {
+        flushList();
+        rendered.push(
+          <p key={`p-${i}`} className="markdown-paragraph">
+            {parseInline(line)}
+          </p>
+        );
+      }
+    }
+    
+    flushList();
+    return <div className="markdown-body-content">{rendered}</div>;
   };
 
   const getRepoLink = (image) => {
@@ -208,10 +401,90 @@ function App() {
       {/* Main Content */}
       <main className="main-content">
         <header className="header" style={{ textTransform: 'capitalize' }}>
-          <h2>{activeTab}</h2>
+          <h2>
+            {currentView === 'releases' ? 'Releases' : currentView === 'changelog' ? 'Changelog' : activeTab}
+          </h2>
         </header>
 
-        {activeTab === 'dashboard' && (
+        {currentView === 'releases' && selectedContainer && (
+          <div className="page-view releases-view">
+            <button className="btn back-btn" onClick={goBack} style={{ marginBottom: '20px' }}>
+              ← Back to {originTab === 'updates' ? 'Updates' : originTab === 'containers' ? 'Containers' : 'Dashboard'}
+            </button>
+            
+            <div style={{ display: 'flex', gap: '10px', marginBottom: '30px' }}>
+              <a href={getRepoLink(selectedContainer.image)} target="_blank" rel="noreferrer" className="btn btn-primary" style={{ textDecoration: 'none' }}>
+                View Repository
+              </a>
+              <a href={getGithubSearchLink(selectedContainer.image)} target="_blank" rel="noreferrer" className="btn" style={{ textDecoration: 'none' }}>
+                <svg style={{marginRight: '6px'}} height="16" viewBox="0 0 16 16" width="16" fill="currentColor">
+                  <path d="M8 0c4.42 0 8 3.58 8 8a8.013 8.013 0 0 1-5.45 7.59c-.4.08-.55-.17-.55-.38 0-.27-.01-1.13-.01-2.2 0-.75-.25-1.23-.54-1.48 1.78-.2 3.65-.88 3.65-3.95 0-.88-.31-1.59-.82-2.15.08-.2.36-1.02-.08-2.12 0 0-.67-.22-2.2.82-.64-.18-1.32-.27-2-.27-.68 0-1.36.09-2 .27-1.53-1.03-2.2-.82-2.2-.82-.44 1.1-.16 1.92-.08 2.12-.51.56-.82 1.28-.82 2.15 0 3.06 1.86 3.75 3.64 3.95-.23.2-.44.55-.51 1.07-.46.21-1.61.55-2.33-.66-.15-.24-.6-.83-1.23-.82-.67.01-.27.38.01.53.34.19.73.9.82 1.13.16.45.68 1.31 2.69.94 0 .67.01 1.3.01 1.49 0 .21-.15.46-.55.38A7.995 7.995 0 0 1 0 8c0-4.42 3.58-8 8-8Z"></path>
+                </svg>
+                Search GitHub
+              </a>
+            </div>
+
+            {remoteLoading ? (
+              <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Loading releases...</div>
+            ) : remoteReleases.length === 0 ? (
+              <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>No release history available.</div>
+            ) : (
+              <div className="releases-list">
+                {remoteReleases.map((r, i) => {
+                  const isCurrent = r.version === selectedContainer.version;
+                  const isLatest = i === 0 && selectedContainer.status === 'update_available';
+                  return (
+                    <div key={`rel-${i}`} className={`release-row ${isCurrent ? 'current' : ''}`}>
+                      <div className="release-info">
+                        <span className="release-date">{getRelativeTime(r.timestamp)}</span>
+                        <span className="release-name">{r.title || r.version}</span>
+                        {isCurrent && <span className="badge badge-current">Current Version</span>}
+                        {isLatest && <span className="badge badge-latest">Latest</span>}
+                      </div>
+                      <button className="btn btn-view-changelog" onClick={() => {
+                        setSelectedRelease(r);
+                        setCurrentView('changelog');
+                      }}>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{marginRight: '6px'}}>
+                          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                          <polyline points="14 2 14 8 20 8"></polyline>
+                          <line x1="16" y1="13" x2="8" y2="13"></line>
+                          <line x1="16" y1="17" x2="8" y2="17"></line>
+                          <polyline points="10 9 9 9 8 9"></polyline>
+                        </svg>
+                        View Changelog
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {currentView === 'changelog' && selectedRelease && (
+          <div className="page-view changelog-view">
+            <button className="btn back-btn" onClick={() => setCurrentView('releases')} style={{ marginBottom: '20px' }}>
+              ← Back to Releases
+            </button>
+            <div className="changelog-header" style={{ marginBottom: '30px' }}>
+              <h2 style={{ fontSize: '24px', fontWeight: 'bold', color: 'var(--text-main)', marginBottom: '8px' }}>
+                {selectedRelease.title || selectedRelease.version} Changelog
+              </h2>
+              <div style={{ color: 'var(--text-muted)', fontSize: '14px' }}>
+                Version {selectedRelease.version} • Published {formatDate(selectedRelease.timestamp)}
+              </div>
+            </div>
+            <div className="changelog-body" style={{ background: 'var(--panel-bg)', padding: '24px', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
+              {selectedRelease.changelog && selectedRelease.changelog !== 'No release notes provided.' ? 
+                renderMarkdown(selectedRelease.changelog) : 
+                <div style={{ color: 'var(--text-muted)' }}>No detailed changelog provided for this release.</div>
+              }
+            </div>
+          </div>
+        )}
+
+        {currentView === 'list' && activeTab === 'dashboard' && (
           <div className="dashboard">
             {/* Stats */}
             <div className="stats-grid">
@@ -264,7 +537,7 @@ function App() {
             ) : (
               <div className="container-grid">
                 {filteredContainers.map((container) => (
-                  <div key={container.id} className="container-card clickable-card" onClick={() => openDetails(container)}>
+                  <div key={container.id} className="container-card clickable-card" onClick={() => openDetails(container, 'dashboard')}>
                     <div className="card-header">
                       <div className="card-title">{container.name}</div>
                       <div className={`status-badge ${container.status === 'update_available' ? 'update' : ''}`}>
@@ -296,37 +569,30 @@ function App() {
           </div>
         )}
 
-        {activeTab === 'updates' && (
+        {currentView === 'list' && activeTab === 'updates' && (
           <div className="page-view">
             <h3 style={{ color: 'var(--text-main)', marginBottom: '1rem' }}>Available Updates</h3>
             <p style={{ color: 'var(--text-muted)' }}>Detailed changelogs for all containers with pending updates.</p>
-            <div className="history-list" style={{ marginTop: '20px' }}>
+            <div className="container-grid" style={{ marginTop: '20px' }}>
               {containers.filter(c => c.status === 'update_available').length === 0 ? (
                 <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>All containers are up to date!</div>
               ) : (
-                containers.filter(c => c.status === 'update_available').map(c => (
-                  <div key={c.id} className="history-item" style={{ marginBottom: '20px', padding: '20px' }}>
-                    <div className="history-header" style={{ marginBottom: '15px' }}>
-                      <span className="history-version" style={{ fontSize: '1.2rem', color: 'var(--text-main)' }}>{c.name}</span>
-                      <span className="history-date">Update to: <span style={{ color: 'var(--accent-color)', fontWeight: 'bold' }}>{c.latest}</span></span>
+                containers.filter(c => c.status === 'update_available').map((container) => (
+                  <div key={container.id} className="container-card clickable-card" onClick={() => openDetails(container, 'updates')}>
+                    <div className="card-header">
+                      <div className="card-title">{container.name}</div>
+                      <div className="status-badge update">Update Available</div>
                     </div>
-                    <div style={{ marginBottom: '15px', display: 'flex', gap: '10px' }}>
-                      <button className="btn btn-primary" onClick={() => openDetails(c)}>
-                        <svg style={{marginRight: '6px'}} height="14" viewBox="0 0 16 16" width="14" fill="currentColor">
-                          <path d="M1.5 8a6.5 6.5 0 1 1 13 0 6.5 6.5 0 0 1-13 0ZM8 0a8 8 0 1 0 0 16A8 8 0 0 0 8 0ZM6.3 4.3a.75.75 0 0 1 1.06 0l3 3a.75.75 0 0 1 0 1.06l-3 3a.75.75 0 1 1-1.06-1.06L8.94 8 6.3 5.36a.75.75 0 0 1 0-1.06Z"></path>
-                        </svg>
-                        Expand Full History
-                      </button>
-                      <a href={getGithubSearchLink(c.image)} target="_blank" rel="noreferrer" className="btn" style={{ textDecoration: 'none', padding: '6px 12px', fontSize: '0.9rem' }}>
-                        <svg style={{marginRight: '6px'}} height="14" viewBox="0 0 16 16" width="14" fill="currentColor">
-                          <path d="M8 0c4.42 0 8 3.58 8 8a8.013 8.013 0 0 1-5.45 7.59c-.4.08-.55-.17-.55-.38 0-.27-.01-1.13-.01-2.2 0-.75-.25-1.23-.54-1.48 1.78-.2 3.65-.88 3.65-3.95 0-.88-.31-1.59-.82-2.15.08-.2.36-1.02-.08-2.12 0 0-.67-.22-2.2.82-.64-.18-1.32-.27-2-.27-.68 0-1.36.09-2 .27-1.53-1.03-2.2-.82-2.2-.82-.44 1.1-.16 1.92-.08 2.12-.51.56-.82 1.28-.82 2.15 0 3.06 1.86 3.75 3.64 3.95-.23.2-.44.55-.51 1.07-.46.21-1.61.55-2.33-.66-.15-.24-.6-.83-1.23-.82-.67.01-.27.38.01.53.34.19.73.9.82 1.13.16.45.68 1.31 2.69.94 0 .67.01 1.3.01 1.49 0 .21-.15.46-.55.38A7.995 7.995 0 0 1 0 8c0-4.42 3.58-8 8-8Z"></path>
-                        </svg>
-                        Search GitHub
-                      </a>
+                    <div className="card-body">
+                      <div className="info-row">
+                        <span className="info-label">Current</span>
+                        <span className="info-value">{container.version === 'latest' && container.digest ? `latest (${container.digest.substring(0, 12)})` : container.version}</span>
+                      </div>
+                      <div className="info-row">
+                        <span className="info-label">Latest</span>
+                        <span className="info-value" style={{ color: 'var(--accent-color)' }}>{container.latest}</span>
+                      </div>
                     </div>
-                    <p className="history-changelog" style={{ background: 'var(--bg-card)', padding: '15px', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
-                      {c.changelog || "No detailed release notes available."}
-                    </p>
                   </div>
                 ))
               )}
@@ -334,7 +600,7 @@ function App() {
           </div>
         )}
 
-        {activeTab === 'containers' && (
+        {currentView === 'list' && activeTab === 'containers' && (
           <div className="page-view">
             <h3 style={{ color: 'var(--text-main)', marginBottom: '1rem' }}>All Containers</h3>
             <p style={{ color: 'var(--text-muted)' }}>Manage your local and remote containers here.</p>
@@ -359,7 +625,7 @@ function App() {
           </div>
         )}
 
-        {activeTab === 'triggers' && (
+        {currentView === 'list' && activeTab === 'triggers' && (
           <div className="page-view">
             <h3 style={{ color: 'var(--text-main)', marginBottom: '1rem' }}>Notification Triggers</h3>
             <p style={{ color: 'var(--text-muted)' }}>Configure webhooks (Discord, NTFY) to run when updates are found.</p>
@@ -400,7 +666,7 @@ function App() {
           </div>
         )}
 
-        {activeTab === 'settings' && (
+        {currentView === 'list' && activeTab === 'settings' && (
           <div className="page-view">
             <h3 style={{ color: 'var(--text-main)', marginBottom: '1rem' }}>Settings & Remote Hosts</h3>
             <p style={{ color: 'var(--text-muted)' }}>Link external helper apps to monitor remote servers.</p>
@@ -450,82 +716,7 @@ function App() {
         )}
       </main>
 
-      {/* Details Modal */}
-      {selectedContainer && (
-        <div className="modal-backdrop" onClick={closeModal}>
-          <div className="modal-content" onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3>{selectedContainer.name}</h3>
-              <button className="close-btn" onClick={closeModal}>×</button>
-            </div>
-            <div className="modal-body">
-              <div className="info-row" style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '10px', marginBottom: '15px' }}>
-                <span className="info-label">Image</span>
-                <span className="info-value" style={{ userSelect: 'all' }}>{selectedContainer.image}</span>
-              </div>
-              <div style={{ marginBottom: '20px', display: 'flex', gap: '10px' }}>
-                <a href={getRepoLink(selectedContainer.image)} target="_blank" rel="noreferrer" className="btn btn-primary" style={{ textDecoration: 'none' }}>
-                  View Repository
-                </a>
-                <a href={getGithubSearchLink(selectedContainer.image)} target="_blank" rel="noreferrer" className="btn" style={{ textDecoration: 'none' }}>
-                  <svg style={{marginRight: '6px'}} height="16" viewBox="0 0 16 16" width="16" fill="currentColor">
-                    <path d="M8 0c4.42 0 8 3.58 8 8a8.013 8.013 0 0 1-5.45 7.59c-.4.08-.55-.17-.55-.38 0-.27-.01-1.13-.01-2.2 0-.75-.25-1.23-.54-1.48 1.78-.2 3.65-.88 3.65-3.95 0-.88-.31-1.59-.82-2.15.08-.2.36-1.02-.08-2.12 0 0-.67-.22-2.2.82-.64-.18-1.32-.27-2-.27-.68 0-1.36.09-2 .27-1.53-1.03-2.2-.82-2.2-.82-.44 1.1-.16 1.92-.08 2.12-.51.56-.82 1.28-.82 2.15 0 3.06 1.86 3.75 3.64 3.95-.23.2-.44.55-.51 1.07-.46.21-1.61.55-2.33-.66-.15-.24-.6-.83-1.23-.82-.67.01-.27.38.01.53.34.19.73.9.82 1.13.16.45.68 1.31 2.69.94 0 .67.01 1.3.01 1.49 0 .21-.15.46-.55.38A7.995 7.995 0 0 1 0 8c0-4.42 3.58-8 8-8Z"></path>
-                  </svg>
-                  Search GitHub
-                </a>
-              </div>
-              
-              <h4 style={{ marginBottom: '10px', color: 'var(--text-main)' }}>Update History</h4>
-              {historyLoading ? (
-                <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Loading history...</div>
-              ) : history.length === 0 ? (
-                <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>No updates recorded yet.</div>
-              ) : (
-                <div className="history-list">
-                  {history.map((h, i) => {
-                    const isCurrent = selectedContainer.version === 'latest' 
-                      ? h.digest === selectedContainer.digest 
-                      : h.version === selectedContainer.version;
-
-                    return (
-                      <div key={i} className={`history-item ${isCurrent ? 'history-item-current' : ''}`}>
-                        <div className="history-header">
-                          <span className="history-version">
-                            {h.version} 
-                            {isCurrent && <span className="current-badge">✓ Currently Installed</span>}
-                          </span>
-                          <span className="history-date">{new Date(h.timestamp).toLocaleString()}</span>
-                        </div>
-                        {h.digest && <div className="history-digest" style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Digest: {h.digest.substring(0, 15)}...</div>}
-                        <p className="history-changelog">{h.changelog}</p>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-              <h4 style={{ marginBottom: '10px', color: 'var(--text-main)', marginTop: '20px' }}>Remote Version History</h4>
-              <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '10px' }}>Global releases and tags available for this container.</p>
-              {remoteLoading ? (
-                <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Fetching remote tags...</div>
-              ) : remoteReleases.length === 0 ? (
-                <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>No remote history available.</div>
-              ) : (
-                <div className="history-list" style={{ maxHeight: '300px', overflowY: 'auto' }}>
-                  {remoteReleases.map((r, i) => (
-                    <div key={`remote-${i}`} className="history-item">
-                      <div className="history-header">
-                        <span className="history-version">{r.version}</span>
-                        <span className="history-date">{r.timestamp ? new Date(r.timestamp).toLocaleString() : ''}</span>
-                      </div>
-                      <p className="history-changelog">{r.changelog}</p>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Details Modal Removed */}
     </div>
   );
 }
