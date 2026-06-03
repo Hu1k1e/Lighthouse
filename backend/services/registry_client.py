@@ -84,9 +84,10 @@ def get_remote_history(image_name: str) -> list:
             
         url = f"https://registry.hub.docker.com/v2/repositories/{repo}/tags?page_size=20"
         response = requests.get(url, timeout=10)
+        history = []
         if response.status_code == 200:
             data = response.json()
-            return [
+            history = [
                 {
                     "version": t.get("name"),
                     "title": t.get("name"),
@@ -96,6 +97,55 @@ def get_remote_history(image_name: str) -> list:
                 for t in data.get("results", []) if t.get("name") != "latest"
             ]
             
+        if not history:
+            # Fallback to GitHub if no history found (e.g. custom registry like lscr.io)
+            parts = image_no_tag.split('/')
+            if len(parts) >= 2:
+                org, name = parts[-2], parts[-1]
+            else:
+                org, name = parts[0], parts[0]
+                
+            # First try heuristic guesses
+            guessed_repos = [f"{org}/{name}", f"{org}/docker-{name}"]
+            for grepo in guessed_repos:
+                rel_url = f"https://api.github.com/repos/{grepo}/releases"
+                rel_res = requests.get(rel_url, timeout=5)
+                if rel_res.status_code == 200:
+                    releases = rel_res.json()
+                    if releases:
+                        return [
+                            {
+                                "version": r.get("tag_name"),
+                                "title": r.get("name") or r.get("tag_name"),
+                                "timestamp": r.get("published_at"),
+                                "changelog": r.get("body", "No release notes provided.")
+                            }
+                            for r in releases[:20]
+                        ]
+            
+            # If guesses fail, use search API
+            search_query = f"{org} {name}"
+            search_url = f"https://api.github.com/search/repositories?q={search_query}&per_page=1"
+            search_res = requests.get(search_url, timeout=5)
+            if search_res.status_code == 200:
+                items = search_res.json().get('items', [])
+                if items:
+                    github_repo = items[0]['full_name']
+                    rel_url = f"https://api.github.com/repos/{github_repo}/releases"
+                    rel_res = requests.get(rel_url, timeout=5)
+                    if rel_res.status_code == 200:
+                        releases = rel_res.json()
+                        return [
+                            {
+                                "version": r.get("tag_name"),
+                                "title": r.get("name") or r.get("tag_name"),
+                                "timestamp": r.get("published_at"),
+                                "changelog": r.get("body", "No release notes provided.")
+                            }
+                            for r in releases[:20]
+                        ]
+                        
+        return history
     except Exception as e:
         print(f"Error fetching remote history for {image_name}: {e}")
     

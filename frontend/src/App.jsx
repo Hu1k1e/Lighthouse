@@ -364,6 +364,11 @@ function App() {
     if (!imgNoTag.includes('/')) {
       return `https://hub.docker.com/_/${imgNoTag}`;
     }
+    const firstPart = imgNoTag.split('/')[0];
+    if (firstPart.includes('.')) {
+      // It's a custom registry (e.g., lscr.io), fallback to GitHub Search
+      return getGithubSearchLink(image);
+    }
     return `https://hub.docker.com/r/${imgNoTag}`;
   };
 
