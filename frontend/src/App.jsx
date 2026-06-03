@@ -436,7 +436,9 @@ function App() {
             ) : (
               <div className="releases-list">
                 {remoteReleases.map((r, i) => {
-                  const isCurrent = r.version === selectedContainer.version;
+                  const cleanContainerVersion = selectedContainer.version.replace(/^v/, '').split('-')[0];
+                  const cleanReleaseVersion = r.version.replace(/^v/, '').split('-')[0];
+                  const isCurrent = cleanContainerVersion === cleanReleaseVersion || r.version === selectedContainer.version;
                   const isLatest = i === 0 && selectedContainer.status === 'update_available';
                   return (
                     <div key={`rel-${i}`} className={`release-row ${isCurrent ? 'current' : ''}`}>
